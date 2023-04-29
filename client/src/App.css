@@ -1,0 +1,191 @@
+@import url('https://fonts.cdnfonts.com/css/gilroy-bold');
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: 'Gilroy-Medium', sans-serif;
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
+}
+
+body, html {
+  background: #6e6c78;
+  height: 100%;
+}
+.content {
+  display: grid;
+  grid-template-columns: 35% 65%;
+  margin: auto 30px;
+  column-gap:  10px;
+  justify-items: start;
+  justify-content: center;
+}
+.sign-content {
+  display: grid;
+  margin: auto 30px;
+}
+.no-auth {
+padding: 250px;
+}
+.no-auth-link {
+  color: white;
+  font-size: 30px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  /* height: 100%; */
+  /* padding: 10 px; */
+}
+footer{
+  flex: 0 0 auto;
+  background-color: #3b3a3d;
+  color: white;
+  padding: 1rem 4rem;
+  text-align: center;
+  margin-top: auto ;
+}
+header{
+  /* flex: 0 0 auto; */
+  background-color: #3b3a3d;
+  color: white;
+  padding: 1rem 4rem;
+  text-align: center;
+  /* margin-top: auto ; */
+}
+.header-link {
+  color: white;
+  padding: 10px;
+}
+header a {
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 10px;
+}
+table { 
+  margin: 20px auto; 
+  word-break: break-all;
+  width: 100%;
+  height: auto;
+  border-spacing: 1; 
+  border-collapse: collapse; 
+  background:white;
+  border-radius:15px;
+  overflow:hidden;   
+  padding: 100px;  
+}  
+thead tr {    
+  background:#7AA899;    
+  text-align: center;
+  height:50px;
+}	
+tbody tr { 
+  height:48px; 
+  border-bottom:1px solid #E3F1D5;
+  text-align: center;
+}
+.submit_delete {
+  background-color: transparent;
+  background-repeat: no-repeat;
+  border: none;
+  cursor: pointer;
+  overflow: hidden;
+  outline: none;
+}
+.submit_thead {
+  font-size:16px;
+  background-color: transparent;
+  background-repeat: no-repeat;
+  border: none;
+  cursor: pointer;
+  overflow: hidden;
+  outline: none;
+}
+form {
+  margin: 20px auto 0;
+  background: white;
+  border-radius: 20px;
+}
+.inputDataForm {
+  height: 550px;
+ }
+.signUpForm {
+  height: 430px;
+ }
+ .signInForm {
+  height: 330px;
+ }
+.signPlaceholder {
+  color: #707981;
+  font-size: 15px;
+  text-align: center;
+  margin-top: 20px;
+}
+.sign-placeholder-link {
+  color: #707981;
+  font-size: 15px;
+  display: flex;
+  justify-content: center;
+}
+.error-message {
+  color: red;
+  font-size: 15px;
+}
+.before-sub-div {
+  height: 30px;
+}
+.form-inner {
+ padding: 40px 50px;
+ width: 350px;
+}
+.form-inner input:not([type="radio"]), .form-inner textarea{
+ display: block;
+ width: 100%;
+ padding: 0 20px;
+ margin-bottom: 10px;
+ background: #E9EFF6;
+ line-height: 40px;
+ border-width: 0;
+ border-radius: 10px;
+}
+.form-inner label {
+  display: inline-block;
+  vertical-align: top;
+  margin-right: 10px;
+}
+.form-inner input[type="radio"] {
+  display: inline;
+}
+.form-inner input[type="submit"] {
+ /* margin-top: 30px; */
+ background: #7AA899;
+ border-bottom: 4px solid #649786;
+ font-size: 16px;
+}
+.form-inner textarea {
+ resize: none;
+ line-height:20px;
+ padding-top: 10px;
+ padding-bottom: 10px;
+}
+.form-inner h3 {
+ margin-top: 0;
+ font-weight: 500;
+ font-size: 24px;
+ color: #707981;
+ margin-bottom: 15px;
+}
+textarea::placeholder {
+  padding-top: 10px;
+}
+::-webkit-calendar-picker-indicator{
+  cursor: pointer;
+}  
