@@ -7,20 +7,10 @@ function Header() {
 
   const exit = async () => {  
     console.log('exit'); 
-      await fetch('/api/users/exit', {
-          method: 'POST',
-          credentials: 'include',
-          body: ''
-      })
-      .then((response) => {
-        console.log('exit');
-          if (response.status === 200) {
-              navigate("/signIn");
-          }        
-      })
-      .catch((err) => {
-          console.log(err.message);
-      });
+    document.cookie = 'token=0; max-age=-1; path=/;';
+    document.cookie = 'id=0; max-age=-1; path=/;';
+    navigate("/signIn")
+    window.location.reload();  
   };
 
   return (
