@@ -3,35 +3,50 @@ import Header from '../components/Header';
 import Footer from '../components/Footer';
 import SignUpForm from '../components/SignUpForm';
 import { useNavigate } from 'react-router-dom';
+import {gql, useApolloClient } from '@apollo/client';
+
+const REGISTER = gql`
+  query Register($name: String!, $email: String!, $password: String!) {
+    register(name: $name, email: $email, password: $password) {
+      userId
+      token
+    }
+  }
+`;
 
 function SignUpPage() {
     const [err, setErr] = useState(null);
     const navigate = useNavigate(); 
+    const client = useApolloClient();
   
     const signUp = async (body) => { 
-        const formData = new FormData();        
-        formData.append('name', body.name);
-        formData.append('email', body.email);
-        formData.append('password', body.password);
-    
-        await fetch('/api/users/register', {
-            method: 'POST',
-            body: formData
-        })
-        .then((response) => {
-            response.json();
-            if (response.status === 201) { 
-                alert('Регистрация прошла успешно!');
-                setErr(null);
-                navigate('/');
+    client.query({
+        query: REGISTER,
+        variables: {name: body.name, email: body.email, password: body.password},
+      })
+      .then(result => {
+         if (result.data && result.data.register) {
+          var tokenData = result.data.register;
+          console.log(tokenData);
 
-            } else if (response.status === 409) {
+        if (tokenData.token !== 'Register error') {
+            if (tokenData.token === 'Email already exist') {
                 setErr('Аккаунт с таким email существует');
+            } else {
+                console.log('Регистрация прошла успешно!');
+                alert('Регистрация прошла успешно!');
+                document.cookie = tokenData.token.token + '; max-age=3600; path=/;';
+                document.cookie = tokenData.token.userId + '; max-age=3600; path=/;';
+                setErr(null);
+
+                navigate("/");
+                window.location.reload();                    
             }
-        })
-        .catch((err) => {
-            console.log(err.message);
-        });
+        }
+      }})
+      .catch(error => {
+        console.error(error);
+      });
     };
   
     return (
