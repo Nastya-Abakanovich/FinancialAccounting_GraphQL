@@ -13,6 +13,7 @@ const jwtConfig = require("./config/jwt.config.js");
 const bcrypt = require('bcrypt');
 const saltRounds = 10;
 const cookieParser = require('cookie-parser');
+const cookie = require("cookie");
 var connection = null;
 
 // const connection = mysql.createConnection({
@@ -48,117 +49,150 @@ const schema = buildSchema(`
     token: String!
   }
 
+  type Spending {
+    user_id: Int!
+    spending_id: Int!
+    sum: Int!
+    date: String!
+    category: String!
+    description: String!
+    income: Boolean!
+    filename: String
+  }
+
   type Query {
     hello: String
     login(email: String!, password: String!): Token!
     register(name: String!, email: String!, password: String!): Token!
+    getData: [Spending!]
   }
   
 `);
 
 const root = {
   hello: () => 'Привет, мир!',
-//   login: ({ email, password }) => {
-//     console.log('login');
-//     var returnToken = {userId: '-5', token: 'Login error'}
-//     try {
-//     connection.query('SELECT * FROM Users WHERE email = \'' + email + '\'',
-//                     function (err, result) {
-//         if (err) returnToken = {userId: '-1', token: 'Login error'};
+
+  login: async ({ email, password }) => {
+    console.log('login');
+    
+    try {
+      await mysqlConnection();
+      const [result] = await connection.execute('SELECT * FROM Users WHERE email = \'' + email + '\'');        
+      if (result.length === 0) {
+        return {userId: '-1', token: 'User not found'};
+      }
         
-//         if (result.length === 0) {
-//           returnToken.userId = '-1';
-//           returnToken = {userId: '-1', token: 'User not found'};    
-//         } else {
-//           const isCorrectValue = bcrypt.compareSync(password, result[0].password);
-
-//           if (!isCorrectValue) {
-            
-//             returnToken = {userId: '-1', token: 'Invalid password'};  
-//             console.log(returnToken); 
-//             console.log('3');   
-//           } else {
-//             const token = jwt.sign({id: result[0].id, name: result[0].name}, jwtConfig.secretKey, {expiresIn: "1h"});
-//             console.log('2');
-
-//             returnToken = {userId: 'id=' + result[0].id, token: 'token=' +  token}   
-//             console.log(returnToken);         
-//           }
-         
-//         }
-        
-//     }); 
-  
-//     console.log(returnToken);
-//     return {userId: returnToken.userId, token: returnToken.token}
-//   }
-//   catch (e) {
-//     console.log(e);
-//   }
-// }
-
-login: async ({ email, password }) => {
-  console.log('login');
-  
-  try {
-    await mysqlConnection();
-    const [result] = await connection.execute('SELECT * FROM Users WHERE email = \'' + email + '\'');
-            
-    if (result.length === 0) {
-      return {userId: '-1', token: 'User not found'};
+      const isCorrectValue = bcrypt.compareSync(password, result[0].password);
+      if (!isCorrectValue) {  
+        return {userId: '-1', token: 'Invalid password'};   
+      } else {
+        const token = jwt.sign({id: result[0].id, name: result[0].name}, jwtConfig.secretKey, {expiresIn: "1h"});
+        return {userId: 'id=' + result[0].id, token: 'token=' +  token}          
+      }
     }
-      
-    const isCorrectValue = bcrypt.compareSync(password, result[0].password);
+    catch (e) {
+      console.log(e);
+    }
+  },
 
-    if (!isCorrectValue) {  
-      return {userId: '-1', token: 'Invalid password'};   
+  register: async ({ name, email, password }) => {
+    console.log('register');
+    
+    try {
+      await mysqlConnection();
+      const [result] = await connection.execute('SELECT * FROM Users WHERE email = \'' + email + '\'');    
+      if (result.length !== 0) {
+        return {userId: '-1', token: 'Email already exist'};
+      }
+
+      const salt = bcrypt.genSaltSync(saltRounds);
+      const passHash = bcrypt.hashSync(password, salt);
+      const [insertUser] = await connection.execute('INSERT Users(name, email, password) VALUES (?,?,?)', 
+      [
+        name,
+        email,
+        passHash
+      ]);
+
+      const token = jwt.sign({id: insertUser.insertId, name: name}, jwtConfig.secretKey, {expiresIn: "1h"});
+      return {userId: 'id=' + insertUser.insertId, token: 'token=' +  token} 
+    }
+    catch (e) {
+      console.log(e);
+    }
+  },
+
+  getData: async (args, req) => {
+    console.log('getData');
+    
+    const cookies = req.cookies;
+    console.log(cookies);
+    if (cookies && cookies.id) {
+      await mysqlConnection();
+      const [result] = await connection.execute('SELECT * FROM Spending WHERE user_id = ' + cookies.id);
+      console.log(result[0]); 
+      return result;   
     } else {
-      const token = jwt.sign({id: result[0].id, name: result[0].name}, jwtConfig.secretKey, {expiresIn: "1h"});
-      return {userId: 'id=' + result[0].id, token: 'token=' +  token}          
+      return null;
     }
   }
-  catch (e) {
-    console.log(e);
-  }
-},
-
-register: async ({ name, email, password }) => {
-  console.log('register');
-  
-  try {
-    await mysqlConnection();
-    const [result] = await connection.execute('SELECT * FROM Users WHERE email = \'' + email + '\'');
-          
-    if (result.length !== 0) {
-      return {userId: '-1', token: 'Email already exist'};
-    }
-
-    const salt = bcrypt.genSaltSync(saltRounds);
-    const passHash = bcrypt.hashSync(password, salt);
-
-    const [insertUser] = await connection.execute('INSERT Users(name, email, password) VALUES (?,?,?)', 
-    [
-      name,
-      email,
-      passHash
-    ]);
-
-    const token = jwt.sign({id: insertUser.insertId, name: name}, jwtConfig.secretKey, {expiresIn: "1h"});
-    return {userId: 'id=' + insertUser.insertId, token: 'token=' +  token} 
-  }
-  catch (e) {
-    console.log(e);
-  }
-}
 
 };
+
+// const authMiddleware = (socket, next) => {
+//   console.log('checkAuth.');
+
+//   try {
+//       const cookies = cookie.parse(socket.handshake?.headers?.cookie === undefined ? "" : socket.handshake.headers.cookie);
+//       if (cookies && cookies.token) {      
+//           const decoderData = jwt.verify(cookies.token, jwtConfig.secretKey);            
+//           console.log(decoderData);
+//           next();             
+//       } else {
+//           next(new Error('Authentication error'));
+//       }
+//   } catch (e) {
+//       console.log(e);
+//       next(new Error('Authentication error'));
+//   }     
+// };
 
 
 const app = express();
 const port = 5000;
 const urlencodedParser = express.urlencoded({extended: false});
 
-app.use(cors());
+var corsOptions = {
+  origin: 'http://localhost:3000',
+  credentials: true // <-- REQUIRED backend setting
+};
+app.use(cors(corsOptions));
+app.use(cookieParser());
+app.use(bodyParser.json());
+
+app.use('/graphql', (req, res, next) => {
+  if (!req.body.query.includes('login') && !req.body.query.includes('register'))
+  {
+     console.log('checkAuth.');
+    try {
+      const cookies = req.cookies;
+      console.log('auth: ' + cookies);
+      if (cookies && cookies.token) {     
+        const decoderData = jwt.verify(cookies.token, jwtConfig.secretKey);            
+        console.log(decoderData);
+        next();             
+      } else {
+        return res.sendStatus(403);
+      }
+    } catch (e) {
+      console.log(e);
+      return res.sendStatus(403);
+    }     
+  } else {
+    next();
+  }
+});
+
 app.use('/graphql', graphqlHTTP({
   schema: schema,
   rootValue: root,
@@ -182,30 +216,6 @@ app.listen(port, () => {
 //     }
 // })
 // const upload = multer({storage: storage});
-
-// function middleware (req, res, next) {
-//     if (req.method === "OPTIONS") {
-//         next();
-//     }
-
-//     try {
-//         var cookies = req.cookies; 
-
-//         if (cookies && cookies.token) {
-//             const decoderData = jwt.verify(cookies.token, jwtConfig.secretKey);            
-//             console.log(decoderData);
-//             console.log('--------------');
-//             next();
-//         } else {
-//             return res.status(401).send({message: "Пользователь не авторизован"});
-//         }   
-//     } catch (e) {
-//         console.log(e);
-//         return res.status(401).send({message: "Пользователь не авторизован"});
-//     }
-// }
-
-
 
 // app.use(bodyParser.json());
 // app.use(cookieParser());
@@ -256,63 +266,6 @@ app.listen(port, () => {
 //         if (err) throw err;
 //         res.status(200).json({"spending_id": result.insertId});
 //     }); 
-// });
-
-// app.post("/api/users/register", upload.single('fileToUpload'), urlencodedParser, function (req, res) {
-      
-//     if(!req.body) return res.sendStatus(400); 
-    
-//     var isDuplicateEmail = false;
-//     connection.query('SELECT * FROM Users', function (err, result) {
-//         if (err) return res.sendStatus(400);
-
-//         result.forEach(item => {
-//             if (item.email === req.body.email) {
-//                 isDuplicateEmail = true;
-//                 return res.status(409).send({ message: 'Email ' + item.email + ' already exist.' });    
-//             }
-//         });
-
-//         if (!isDuplicateEmail) {
-//             const salt = bcrypt.genSaltSync(saltRounds);
-//             const passHash = bcrypt.hashSync(req.body.password, salt);
-        
-//             connection.query('INSERT Users(name, email, password) VALUES (?,?,?)',
-//             [
-//             req.body.name,
-//             req.body.email,
-//             passHash
-//             ], function (err, result) {
-//                 if (err) throw err;
-//                 const token = jwt.sign({id: result.insertId, name: req.body.name}, jwtConfig.secretKey, {expiresIn: "1h"});
-
-//                 res.cookie("token", token, {
-//                                 httpOnly: true,
-//                                 sameSite: "strict",
-//                                 expires: new Date(Date.now() + 1 * 3600000)
-//                       });
-
-//                 res.cookie("user", { name: req.body.name, id: result.insertId }, {
-//                         httpOnly: true,
-//                         sameSite: "strict",
-//                         expires: new Date(Date.now() + 1 * 3600000)
-//                 });
-//                 return res.status(201).send();
-
-//             }); 
-//         }
-//     });
-
-// });
-
-// app.post("/api/users/exit", upload.single('fileToUpload'), urlencodedParser, function (req, res) {
-      
-//     if(!req.body) return res.sendStatus(400);   
-    
-//     res.status(200);
-//     res.cookie('token', '', { maxAge: -1 });
-//     res.cookie('user', '', { maxAge: -1 });
-//     res.send();
 // });
 
 // app.put("/api", upload.single('fileToUpload'), urlencodedParser, middleware, function(req, res){
