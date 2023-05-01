@@ -21,6 +21,12 @@ const GET_DATA = gql`
   }
 `;
 
+const DELETE = gql`
+  query Delete($id: Int!) {
+    delete(id: $id)
+  }
+`;
+
 function HomePage() {
     const [items, setItems] = useState(null);
     const [updItem, setUpdItem] = useState(null);
@@ -52,12 +58,21 @@ function HomePage() {
     }, [])
   
     const deleteItem = async (id) => {
-//       await fetch('/api/' + id,{ method: 'DELETE',})
-//       .then((response) => {
-//           if (response.status === 200) {
-//             setItems(actualItems => actualItems.filter(data => data.spending_id !== id));
-//           }
-//       }); 
+      client.query({
+        query: DELETE,
+        variables: {id},
+      })
+      .then(result => {
+        if (result.data && result.data.delete) {
+          setItems(actualItems => actualItems.filter(data => data.spending_id !== id));
+        }
+      })
+      .catch(error => {
+        console.error(error);
+        if (error.message.toLowerCase().includes('forbidden')) {
+          navigate('/signIn');
+        }
+      });
     };
   
     const deleteFile = async (id) => { 
@@ -77,12 +92,15 @@ function HomePage() {
 //       .catch((err) => {
 //         console.log(err.message);
 //       });
+
+
+
     };
   
     const fillForm = async (item) => {
-//       setUpdItem(item);
-//       console.log(item);
-//       console.log(updItem);
+      setUpdItem(item);
+      console.log(item);
+      console.log(updItem);
     };
   
     const addItems = async (body, selectedFile) => { 

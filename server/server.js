@@ -65,9 +65,12 @@ const schema = buildSchema(`
     login(email: String!, password: String!): Token!
     register(name: String!, email: String!, password: String!): Token!
     getData: [Spending!]
+    delete(id: Int!): Boolean!
   }
   
 `);
+
+// addData(sum: Int!, category: String!, description: String!, date: String!, type: Boolean!, fileToUpload: Upload!): [Spending!]
 
 const root = {
   hello: () => 'Привет, мир!',
@@ -135,28 +138,26 @@ const root = {
     } else {
       return null;
     }
+  },
+
+  delete: async ({id}, req) => {
+    console.log('delete');
+    
+    const cookies = req.cookies;
+    if (cookies && cookies.id) {
+      await mysqlConnection();
+      const [result] = await connection.execute('DELETE FROM Spending WHERE spending_id=' + id 
+                                                + ' AND user_id=' + cookies.id);
+      if (result.affectedRows === 0)
+        return false;
+      else
+        return true;  
+    } else {
+      return false;
+    }
   }
 
 };
-
-// const authMiddleware = (socket, next) => {
-//   console.log('checkAuth.');
-
-//   try {
-//       const cookies = cookie.parse(socket.handshake?.headers?.cookie === undefined ? "" : socket.handshake.headers.cookie);
-//       if (cookies && cookies.token) {      
-//           const decoderData = jwt.verify(cookies.token, jwtConfig.secretKey);            
-//           console.log(decoderData);
-//           next();             
-//       } else {
-//           next(new Error('Authentication error'));
-//       }
-//   } catch (e) {
-//       console.log(e);
-//       next(new Error('Authentication error'));
-//   }     
-// };
-
 
 const app = express();
 const port = 5000;
@@ -164,7 +165,7 @@ const urlencodedParser = express.urlencoded({extended: false});
 
 var corsOptions = {
   origin: 'http://localhost:3000',
-  credentials: true // <-- REQUIRED backend setting
+  credentials: true 
 };
 app.use(cors(corsOptions));
 app.use(cookieParser());
