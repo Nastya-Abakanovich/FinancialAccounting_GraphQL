@@ -4,10 +4,15 @@ import { BrowserRouter } from 'react-router-dom';
 import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
-import { ApolloClient, InMemoryCache, ApolloProvider } from '@apollo/client';
+import { ApolloClient, InMemoryCache, ApolloProvider, createHttpLink } from '@apollo/client';
+
+const link = createHttpLink({
+  uri: 'http://localhost:5000/graphql',
+  credentials: 'include'
+});
 
 const client = new ApolloClient({
-  uri: 'http://localhost:5000/graphql', // URL сервера GraphQL
+  link, 
   cache: new InMemoryCache(),
 });
 
