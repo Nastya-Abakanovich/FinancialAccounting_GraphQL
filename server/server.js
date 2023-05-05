@@ -14,6 +14,8 @@ const bcrypt = require('bcrypt');
 const saltRounds = 10;
 const cookieParser = require('cookie-parser');
 const cookie = require("cookie");
+const fs = require('fs');
+var path = require('path');
 var connection = null;
 
 // const connection = mysql.createConnection({
@@ -66,6 +68,7 @@ const schema = buildSchema(`
     register(name: String!, email: String!, password: String!): Token!
     getData: [Spending!]
     delete(id: Int!): Boolean!
+    deleteFile(id: Int!): Boolean!
   }
   
 `);
@@ -129,11 +132,9 @@ const root = {
     console.log('getData');
     
     const cookies = req.cookies;
-    console.log(cookies);
     if (cookies && cookies.id) {
       await mysqlConnection();
       const [result] = await connection.execute('SELECT * FROM Spending WHERE user_id = ' + cookies.id);
-      console.log(result[0]); 
       return result;   
     } else {
       return null;
@@ -146,12 +147,54 @@ const root = {
     const cookies = req.cookies;
     if (cookies && cookies.id) {
       await mysqlConnection();
+      const [selectResult] = await connection.execute('SELECT filename FROM Spending WHERE user_id = ' + cookies.id  
+                                                      + ' AND spending_id = ' + id);
       const [result] = await connection.execute('DELETE FROM Spending WHERE spending_id=' + id 
                                                 + ' AND user_id=' + cookies.id);
       if (result.affectedRows === 0)
         return false;
-      else
-        return true;  
+      else {
+        try {
+          if (selectResult[0].filename !== null) {
+          var fileName = './public/uploads/' + id + path.extname(selectResult[0].filename);
+          fs.unlinkSync('./public/uploads/' + id + path.extname(selectResult[0].filename));
+          console.log('file exists');
+          }
+        } catch {
+          console.error('file does not exists');
+        }
+        return true;
+      }  
+    } else {
+      return false;
+    }
+  },
+
+  // TODO: разобраться с проблемой удаления. Файл с сервера удаляется, с сервера возвращается тру, 
+  // но на клиенте происходит ошибка и удаление не отображается
+  deleteFile: async ({id}, req) => {
+    console.log('deleteFile');
+    
+    const cookies = req.cookies;
+    if (cookies && cookies.id) {
+      await mysqlConnection();
+      const [selectResult] = await connection.execute('SELECT filename FROM Spending WHERE user_id = ' + cookies.id + ' AND spending_id = ' + id);
+      const [result] = await connection.execute('UPDATE Spending SET filename = null WHERE spending_id = ?  AND user_id = ?',
+        [
+        id,
+        cookies.id
+        ]);
+      console.log('Before delete file');
+      try {
+        fs.unlinkSync('./public/uploads/' + id + path.extname(selectResult[0].filename));
+        console.log('After delete file');
+        return true;
+      } catch (err) {
+        console.log('No After delete file');
+        console.error(err);
+        return false;
+      }        
+          
     } else {
       return false;
     }
@@ -159,6 +202,32 @@ const root = {
 
 };
 
+
+// console.log('deleteFile');
+
+// const cookies = cookie.parse(socket.handshake?.headers?.cookie === undefined ? "" : socket.handshake.headers.cookie);
+// if (cookies && cookies.id) {
+//     connection.query('SELECT filename FROM Spending WHERE user_id = ' + cookies.id + ' AND spending_id = ' 
+//                     + id, function (err, selectResult) {
+//         if (err) return socket.emit('deleteFileResponse', 'Deletion file error');
+
+//         connection.query('UPDATE Spending SET filename = null WHERE spending_id = ?  AND user_id = ?',
+//         [
+//         id,
+//         cookies.id
+//         ], function (err, result) {
+//             if (err) throw err;
+//             fs.unlink('./public/uploads/' + id + path.extname(selectResult[0].filename), function(err){
+//                 if (err) 
+//                     socket.emit('deleteFileResponse', 'Deletion file error');
+//                 else    
+//                     socket.emit('deleteFileResponse', 'Successfully deleted file');
+//             });          
+//         });
+//     });
+// } else {
+//     socket.emit('deleteFileResponse', 'Deletion file error');
+// }
 const app = express();
 const port = 5000;
 const urlencodedParser = express.urlencoded({extended: false});
@@ -170,6 +239,7 @@ var corsOptions = {
 app.use(cors(corsOptions));
 app.use(cookieParser());
 app.use(bodyParser.json());
+app.use(express.static('public'));
 
 app.use('/graphql', (req, res, next) => {
   if (!req.body.query.includes('login') && !req.body.query.includes('register'))
@@ -194,6 +264,8 @@ app.use('/graphql', (req, res, next) => {
   }
 });
 
+
+
 app.use('/graphql', graphqlHTTP({
   schema: schema,
   rootValue: root,
@@ -203,10 +275,6 @@ app.use('/graphql', graphqlHTTP({
 app.listen(port, () => {
   console.log('Сервер GraphQL запущен на порте ' + port);
 });
-
-
-
-
 
 // const storage = multer.diskStorage ({
 //     destination: (req, file, cb) =>{
@@ -229,25 +297,6 @@ app.listen(port, () => {
 //         else 
 //             res.end(file);
 //       });
-// });
-
-// app.get("/api", middleware, function(req, res){      
-//     connection.query('SELECT * FROM Spending WHERE user_id = ' + req.cookies.user.id, function (err, result) {
-//         if (err) res.sendStatus(400);
-//         return res.status(200).send({"items": result});
-//     });
-// });
-
-// app.delete("/api/:id", middleware, function(req, res){       
-//     const id = req.params.id;
-//     connection.query('DELETE FROM Spending WHERE spending_id=' + id 
-//                         + ' AND user_id=' + req.cookies.user.id, function (err, result) {
-//         if (err) res.sendStatus(400);
-//         if (result.affectedRows === 0)
-//             res.status(404).send({ message: 'Unable delete item' });
-//         else
-//             res.status(200).send({ message: 'Deleted item with id=' + id });       
-//     });
 // });
 
 // app.post("/api", upload.single('fileToUpload'), urlencodedParser, middleware, function (req, res) {
@@ -320,8 +369,4 @@ app.listen(port, () => {
 //             res.status(200).send({ message: 'File delete from item with id=' + req.body.spending_id});
 //         }); 
 
-// });
-
-// app.listen(port, () => {
-//     console.log('Listening on port ', port);
 // });

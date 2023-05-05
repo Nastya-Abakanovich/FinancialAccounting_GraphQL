@@ -27,6 +27,12 @@ const DELETE = gql`
   }
 `;
 
+const DELETE_FILE = gql`
+  query DeleteFile($id: Int!) {
+    deleteFile(id: $id)
+  }
+`;
+
 function HomePage() {
     const [items, setItems] = useState(null);
     const [updItem, setUpdItem] = useState(null);
@@ -76,25 +82,22 @@ function HomePage() {
     };
   
     const deleteFile = async (id) => { 
-//       const formData = new FormData();        
-//       formData.append('spending_id', id);
-  
-//       await fetch('/api/deleteFile', {
-//         method: 'PUT',
-//         body: formData
-//       })
-//       .then((response) => {
-//         response.json();
-//         if (response.status === 200) {              
-//           setItems(prevItems => prevItems.map(item => item.spending_id === id ? { ...item, filename: null } : item));
-//         }
-//       })
-//       .catch((err) => {
-//         console.log(err.message);
-//       });
-
-
-
+      client.query({
+        query: DELETE_FILE,
+        variables: {id},
+      })
+      .then(result => {
+        if (result.data && result.data.deleteFile) {
+          console.log('deleteFile OK')
+          setItems(prevItems => prevItems.map(item => item.spending_id === id ? { ...item, filename: null } : item));
+        }
+      })
+      .catch(error => {
+        console.error(error);
+        if (error.message.toLowerCase().includes('forbidden')) {
+          navigate('/signIn');
+        }
+      });
     };
   
     const fillForm = async (item) => {
