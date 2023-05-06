@@ -34,6 +34,11 @@ const schema = buildSchema(`
     token: String!
   }
 
+  type File {
+    filename: String!
+    file: String!
+  }
+
   type Spending {
     user_id: Int!
     spending_id: Int!
@@ -48,7 +53,8 @@ const schema = buildSchema(`
   type Query {
     login(email: String!, password: String!): Token!
     register(name: String!, email: String!, password: String!): Token!
-    getData: [Spending!]    
+    getData: [Spending!]   
+    getFile(id: Int!): File   
   }
 
   type Mutation {
@@ -152,8 +158,6 @@ const root = {
     }
   },
 
-  // TODO: разобраться с проблемой удаления. Файл с сервера удаляется, с сервера возвращается тру, 
-  // но на клиенте происходит ошибка и удаление не отображается
   deleteFile: async ({id}, req) => {
     console.log('deleteFile');
     
@@ -223,6 +227,37 @@ const root = {
         return null;
       }
     },
+
+    getFile: async ({id}, req) => {
+      console.log('getFile');
+      
+      const cookies = req.cookies;
+      if (cookies && cookies.id) {
+        await mysqlConnection();
+        const [result] = await connection.execute('SELECT filename FROM Spending WHERE user_id = ' + cookies.id + ' AND spending_id = ' + id);
+        return {filename: result[0].filename, 
+                file: fs.readFileSync('./public/uploads/' + id + path.extname(result[0].filename)).toString('base64')};           
+      } else {
+        return null;
+      }
+    },
+  
+  //   socket.on('getFile', (id) => {
+  //     console.log('getFile');
+
+  //     const cookies = cookie.parse(socket.handshake?.headers?.cookie === undefined ? "" : socket.handshake.headers.cookie);
+  //     if (cookies && cookies.id) {
+  //         connection.query('SELECT filename FROM Spending WHERE user_id = ' + cookies.id + ' AND spending_id = ' + id, 
+  //         function (err, selectResult) {
+  //             if (err) return socket.emit('getFileResponse', 'Getting file error');             
+  //             socket.emit('getFileResponse', {file: fs.readFileSync('./public/uploads/' + id + 
+  //                         path.extname(selectResult[0].filename)), filename: selectResult[0].filename})
+  //     });
+  //     } else {
+  //         socket.emit('getFileResponse', 'Getting file error');
+  //     }
+  // });
+
 };
 
 const app = express();

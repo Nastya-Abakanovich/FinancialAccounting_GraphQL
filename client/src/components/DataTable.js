@@ -8,34 +8,6 @@ class DataTable extends React.Component {
       var items = props.items;
       this.state = {items: items, sortField: "", sortOrder: "asc"};
     }
-  
-    // static getDerivedStateFromProps(props, state) {
-    //   // Any time the current user changes,
-    //   // Reset any parts of state that are tied to that user.
-    //   // In this simple example, that's just the email.
-    //   if (props.items !== null && props.items !== state.items) {
-    //     if (this.state.sortField !== "") {
-    //       let sorted = props.items.slice();
-    //       sorted = sorted.sort((a, b) =>    
-    //         a[state.sortField].toString().localeCompare(b[state.sortField].toString(), "ru", {
-    //           numeric: true,
-    //         }) * (state.sortOrder === "asc" ? 1 : -1)        
-    //       );
-    //       return {
-    //         items: props.items,
-    //         sortField: state.sortField, 
-    //         sortOrder: state.sortOrder
-    //       };
-    //     }
-    //     else
-    //       return {
-    //         items: props.items,
-    //         sortField: state.sortField, 
-    //         sortOrder: state.sortOrder
-    //       };
-    //   }
-    //   return null;
-    // }
 
     componentWillReceiveProps(nextProps) {
       if (this.state.sortField !== "") {
@@ -115,7 +87,8 @@ class DataTable extends React.Component {
                 <td>{item.description}</td>
                 <td>{Moment(item.date).format('DD.MM.YYYY')}</td>
                 <td>{item.income ? "Доходы" : "Расходы"}</td>
-                <td><a href={"http://localhost:5000/api/" + item.filename} target="_blank" >{item.filename}</a>
+                <td>
+                <a onClick={() => this.props.openFile(item.spending_id)}>{item.filename}</a>
                   {item.filename != null ? <FiX onClick={() => this.props.deleteFile(item.spending_id)} /> : null }              
                 </td>
                 <td><FiTrash onClick={() => this.props.onClickDelete(item.spending_id)} /></td>

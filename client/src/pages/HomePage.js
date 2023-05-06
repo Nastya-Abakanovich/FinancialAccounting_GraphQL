@@ -21,6 +21,15 @@ const GET_DATA = gql`
   }
 `;
 
+const GET_FILE = gql`
+  query GetFile ($id: Int!){
+    getFile(id: $id) {
+      filename
+      file
+    }
+  }
+`;
+
 const ADD = gql`
   mutation Add($sum: Int!, $category: String!, $description: String!, $date: String!, $type: Boolean!, $filename: String, $fileToUpload: String) {
     add (sum: $sum, category: $category, description: $description, date: $date, type: $type, filename: $filename, fileToUpload: $fileToUpload ) {
@@ -77,6 +86,48 @@ function HomePage() {
         }
       });
     }, [])
+
+    const openFile = async (id) => {
+      client.query({
+        query: GET_FILE,
+        variables: {id},
+      })
+      .then(result => {
+        if (result.data && result.data.getFile) {
+          const byteCharacters = atob(result.data.getFile.file);
+          const byteNumbers = new Array(byteCharacters.length);
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+          }
+          const byteArray = new Uint8Array(byteNumbers);
+
+          const fileBlob = new Blob([byteArray]);
+          
+          const fileType = result.data.getFile.filename.split('.').pop().toLowerCase();
+          const fileUrlObject = URL.createObjectURL(fileBlob);
+          const newWindow = window.open('', '_blank');
+          
+          if (fileType === 'jpg' || fileType === 'png' || fileType === 'gif') {
+            newWindow.document.write(`<img src="${fileUrlObject}" />`);
+          } else if (fileType === 'mp4' || fileType === 'avi' || fileType === 'mov') {
+            newWindow.document.write(`<video src="${fileUrlObject}" autoplay controls></video>`);
+          } else {
+            const reader = new FileReader();
+            reader.onload = () => {
+              const text = reader.result;
+              newWindow.document.write(text);
+            };
+            reader.readAsText(fileBlob);
+          }
+        }
+      })
+      .catch(error => {
+        console.error(error);
+        if (error.message.toLowerCase().includes('forbidden')) {
+          navigate('/signIn');
+        }
+      });
+    };
 
     const deleteItem = async (id) => {
       client.mutate({
@@ -209,6 +260,7 @@ function HomePage() {
             onClickDelete={deleteItem}
             onClickUpdate={fillForm}
             deleteFile={deleteFile}
+            openFile={openFile}
           />   
         </div> )   
       } else {
