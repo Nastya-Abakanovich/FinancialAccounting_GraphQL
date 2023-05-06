@@ -5,14 +5,13 @@ const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const bodyParser = require('body-parser'); 
 const mysql = require('mysql2/promise');
+const cookieParser = require('cookie-parser');
+const fs = require('fs');
+var path = require('path');
 const dbConfig = require("./config/db.config.js");
 const jwtConfig = require("./config/jwt.config.js");
 const bcrypt = require('bcrypt');
 const saltRounds = 10;
-const cookieParser = require('cookie-parser');
-const cookie = require("cookie");
-const fs = require('fs');
-var path = require('path');
 var connection = null;
 
 async function  mysqlConnection() {
@@ -61,6 +60,7 @@ const schema = buildSchema(`
     deleteFile(id: Int!): Boolean!
     delete(id: Int!): Boolean!
     add(sum: Int!, category: String!, description: String!, date: String!, type: Boolean!, filename: String, fileToUpload: String): Spending
+    update(sum: Int!, category: String!, description: String!, date: String!, type: Boolean!, spending_id: Int!, filename: String, fileToUpload: String): Spending
   }
   
 `);
@@ -241,23 +241,71 @@ const root = {
         return null;
       }
     },
-  
-  //   socket.on('getFile', (id) => {
-  //     console.log('getFile');
 
-  //     const cookies = cookie.parse(socket.handshake?.headers?.cookie === undefined ? "" : socket.handshake.headers.cookie);
-  //     if (cookies && cookies.id) {
-  //         connection.query('SELECT filename FROM Spending WHERE user_id = ' + cookies.id + ' AND spending_id = ' + id, 
-  //         function (err, selectResult) {
-  //             if (err) return socket.emit('getFileResponse', 'Getting file error');             
-  //             socket.emit('getFileResponse', {file: fs.readFileSync('./public/uploads/' + id + 
-  //                         path.extname(selectResult[0].filename)), filename: selectResult[0].filename})
-  //     });
-  //     } else {
-  //         socket.emit('getFileResponse', 'Getting file error');
-  //     }
-  // });
+    update: async ({sum, category, description, date, type, spending_id, filename, fileToUpload}, req) => {
+      console.log('update');
+      
+      const cookies = req.cookies;
+      if (cookies && cookies.id) {
+        await mysqlConnection();
+        try {
 
+          if (fileToUpload !== null) {
+            const [selectResult] = await connection.execute('SELECT filename FROM Spending WHERE user_id = ' + cookies.id + ' AND spending_id = ' 
+            + spending_id);
+
+            if (selectResult[0].filename !== null) {
+              fs.unlinkSync('./public/uploads/' + spending_id + path.extname(selectResult[0].filename));
+            }
+
+            const [result] = await connection.execute('UPDATE Spending SET sum = ?, date = ?, category = ?, description = ?, income = ?, filename = ? ' +
+            'WHERE spending_id = ?  AND user_id = ?',
+            [
+              sum * 100,
+              new Date(date * 1),
+              category,
+              description,
+              type,
+              filename,
+              spending_id,
+              cookies.id
+            ]);
+                
+            const buffer = Buffer.from(fileToUpload, 'base64');
+            await fs.promises.writeFile('./public/uploads/' + spending_id  + path.extname(filename), buffer); 
+          } else {
+
+            const [result] = await connection.execute('UPDATE Spending SET sum = ?, date = ?, category = ?, description = ?, income = ? ' +
+            'WHERE spending_id = ?  AND user_id = ?',
+            [
+              sum * 100,
+              new Date(date * 1),
+              category,
+              description,
+              type,
+              spending_id,
+              cookies.id
+            ]);   
+          }
+
+          return {
+            user_id: cookies.id,
+            spending_id: spending_id,
+            sum: sum,
+            date: date,
+            category: category,
+            description: description,
+            income: type,
+            filename: filename
+          }
+        } catch (err) {
+          console.error(err);
+          return null;
+        }     
+      } else {
+        return null;
+      }
+    }
 };
 
 const app = express();
@@ -305,50 +353,3 @@ app.use('/graphql', graphqlHTTP({
 app.listen(port, () => {
   console.log('Сервер GraphQL запущен на порте ' + port);
 });
-
-
-// app.get('/api/:filename', (req, res) => {
-//     res.status(200).sendFile(__dirname + '/public/uploads/' + req.params.filename, (err, file) => {
-//         if (err) 
-//             res.sendStatus(404)
-//         else 
-//             res.end(file);
-//       });
-// });
-
-// app.put("/api", upload.single('fileToUpload'), urlencodedParser, middleware, function(req, res){
-  
-//     if(!req.body) return res.sendStatus(400);
-    
-//     console.log(req.body)
-//     if (req.file !== null) {
-//         connection.query('UPDATE Spending SET sum = ?, date = ?, category = ?, description = ?, income = ?, filename = ? WHERE spending_id = ?  AND user_id = ?',
-//             [
-//                 req.body.sum * 100,
-//                 req.body.date,
-//                 req.body.category,
-//                 req.body.description,
-//                 req.body.type === 'income',
-//                 req.file ? req.file.originalname : null,
-//                 req.body.spending_id,
-//                 req.cookies.user.id
-//             ], function (err, result) {
-//                 if (err) throw err;
-//                 res.status(200).send({ message: 'Update item with id=' + req.body.spending_id });
-//             }); 
-//     } else {
-//         connection.query('UPDATE Spending SET sum = ?, date = ?, category = ?, description = ?, income = ? WHERE spending_id = ?  AND user_id = ?',
-//         [
-//             req.body.sum * 100,
-//             req.body.date,
-//             req.body.category,
-//             req.body.description,
-//             req.body.type === 'income',
-//             req.body.spending_id, 
-//             req.cookies.user.id
-//         ], function (err, result) {
-//             if (err) throw err;
-//             res.status(200).send({ message: 'Update item with id=' + req.body.spending_id});
-//         }); 
-//     }
-// });

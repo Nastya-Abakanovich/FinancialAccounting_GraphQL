@@ -45,6 +45,21 @@ const ADD = gql`
   }
 `;
 
+const UPDATE = gql`
+  mutation Update($sum: Int!, $category: String!, $description: String!, $date: String!, $type: Boolean!, $spending_id: Int!, $filename: String, $fileToUpload: String) {
+    update (sum: $sum, category: $category, description: $description, date: $date, type: $type, spending_id: $spending_id, filename: $filename, fileToUpload: $fileToUpload ) {
+      user_id
+      spending_id
+      sum
+      date
+      category
+      description
+      income
+      filename
+    }
+  }
+`;
+
 const DELETE = gql`
   mutation Delete($id: Int!) {
     delete(id: $id)
@@ -204,37 +219,43 @@ function HomePage() {
     };
   
     const updateItems = async (body, selectedFile) => { 
-//       const formData = new FormData();        
-//       formData.append('sum', body.sum);
-//       formData.append('category', body.category);
-//       formData.append('description', body.description);
-//       formData.append('date', body.date);
-//       formData.append('type', body.type);
-//       formData.append('spending_id', body.spending_id);
-//       formData.append('fileToUpload', selectedFile);
-  
-//       await fetch('/api', {
-//           method: 'PUT',
-//           body: formData
-//       })
-//       .then((response) => {
-//         response.json();
-//         setUpdItem(null);
-//         if (response.status === 200) {          
-//           if (selectedFile !== null)
-//             setItems(prevItems => prevItems.map(item => item.spending_id === body.spending_id ? 
-//               { ...item, sum: body.sum * 100, user_id: 1, category: body.category, 
-//                 description: body.description, income: body.type === "income" ? 1 : 0, date: new Date(body.date), 
-//                 filename: selectedFile.name} : item));
-//           else
-//           setItems(prevItems => prevItems.map(item => item.spending_id === body.spending_id ? 
-//             { ...item, sum: body.sum * 100, user_id: 1, category: body.category, 
-//               description: body.description, income: body.type === "income" ? 1 : 0, date: new Date(body.date)} : item));
-//         }
-//       })
-//       .catch((err) => {
-//         console.log(err.message);
-//       });
+      var tmpDate = new Date(body.date);
+      const base64 = selectedFile !== null? await fileToBase64(selectedFile) : null;
+      client.mutate({
+        mutation: UPDATE,
+        variables: {
+          sum: body.sum * 1, 
+          category: body.category, 
+          description: body.description, 
+          date: tmpDate.getTime().toString(), 
+          type: body.type === "income",
+          spending_id: body.spending_id,
+          filename: selectedFile !== null ? selectedFile.name : null,  
+          fileToUpload: base64},
+      })
+      .then(result => {
+        
+        if (result.data && result.data.update) {
+
+          setUpdItem(null);
+          var data = result.data.update;
+          if (data.filename !== null)
+            setItems(prevItems => prevItems.map(item => item.spending_id === data.spending_id ? 
+              { ...item, sum: data.sum * 100, user_id: data.user_id, category: data.category, 
+                description: data.description, income: data ? 1 : 0, date: new Date(data.date * 1), 
+                filename: data.filename} : item));
+          else
+            setItems(prevItems => prevItems.map(item => item.spending_id === data.spending_id ? 
+              { ...item, sum: data.sum * 100, user_id: data.user_id, category: data.category, 
+                description: data.description, income: data.type ? 1 : 0, date: new Date(data.date * 1)} : item));
+        }
+      })
+      .catch(error => {
+        console.error(error);
+        if (error.message.toLowerCase().includes('forbidden')) {
+          navigate('/signIn');
+        }
+      });
     };
 
     function fileToBase64(file) {
