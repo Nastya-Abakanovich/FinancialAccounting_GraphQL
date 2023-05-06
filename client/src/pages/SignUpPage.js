@@ -35,8 +35,8 @@ function SignUpPage() {
             } else {
                 console.log('Регистрация прошла успешно!');
                 alert('Регистрация прошла успешно!');
-                document.cookie = tokenData.token.token + '; max-age=3600; path=/;';
-                document.cookie = tokenData.token.userId + '; max-age=3600; path=/;';
+                document.cookie = tokenData.token + '; max-age=3600; path=/;';
+                document.cookie = tokenData.userId + '; max-age=3600; path=/;';
                 setErr(null);
 
                 navigate("/");

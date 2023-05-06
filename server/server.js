@@ -144,9 +144,8 @@ const root = {
       else {
         try {
           if (selectResult[0].filename !== null) {
-          // var fileName = './public/uploads/' + id + path.extname(selectResult[0].filename);
-          fs.unlinkSync('./public/uploads/' + id + path.extname(selectResult[0].filename));
-          console.log('file exists');
+            fs.unlinkSync('./public/uploads/' + id + path.extname(selectResult[0].filename));
+            console.log('file exists');
           }
         } catch {
           console.error('file does not exists');
