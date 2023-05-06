@@ -4,7 +4,7 @@ import DataTable from '../components/DataTable';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { useNavigate } from 'react-router-dom';
-import {gql, useApolloClient } from '@apollo/client';
+import { gql, useApolloClient } from '@apollo/client';
 
 const GET_DATA = gql`
   query {
@@ -21,14 +21,29 @@ const GET_DATA = gql`
   }
 `;
 
+const ADD = gql`
+  mutation Add($sum: Int!, $category: String!, $description: String!, $date: String!, $type: Boolean!, $filename: String, $fileToUpload: String) {
+    add (sum: $sum, category: $category, description: $description, date: $date, type: $type, filename: $filename, fileToUpload: $fileToUpload ) {
+      user_id
+      spending_id
+      sum
+      date
+      category
+      description
+      income
+      filename
+    }
+  }
+`;
+
 const DELETE = gql`
-  query Delete($id: Int!) {
+  mutation Delete($id: Int!) {
     delete(id: $id)
   }
 `;
 
 const DELETE_FILE = gql`
-  query DeleteFile($id: Int!) {
+mutation DeleteFile($id: Int!) {
     deleteFile(id: $id)
   }
 `;
@@ -62,10 +77,10 @@ function HomePage() {
         }
       });
     }, [])
-  
+
     const deleteItem = async (id) => {
-      client.query({
-        query: DELETE,
+      client.mutate({
+        mutation: DELETE,
         variables: {id},
       })
       .then(result => {
@@ -82,8 +97,8 @@ function HomePage() {
     };
   
     const deleteFile = async (id) => { 
-      client.query({
-        query: DELETE_FILE,
+      client.mutate({
+        mutation: DELETE_FILE,
         variables: {id},
       })
       .then(result => {
@@ -107,31 +122,34 @@ function HomePage() {
     };
   
     const addItems = async (body, selectedFile) => { 
-//       const formData = new FormData();        
-//       formData.append('sum', body.sum);
-//       formData.append('category', body.category);
-//       formData.append('description', body.description);
-//       formData.append('date', body.date);
-//       formData.append('type', body.type);
-//       formData.append('fileToUpload', selectedFile);
-  
-//       await fetch('/api', {
-//           method: 'POST',
-//           body: formData
-//       })
-//       .then((response) => response.json())
-//       .then((data) => {
-//         body["spending_id"] = data.spending_id;
-//         body["sum"] *= 100;
-//         if (selectedFile !== null)
-//           body["filename"] = selectedFile.name;
-//         else
-//           body["filename"] = null;
-//         setItems((items) => [...items, body]);
-//       })
-//       .catch((err) => {
-//         console.log(err.message);
-//       });
+      var tmpDate = new Date(body.date);
+      const base64 = selectedFile !== null? await fileToBase64(selectedFile) : null;
+      client.mutate({
+        mutation: ADD,
+        variables: {
+          sum: body.sum * 1, 
+          category: body.category, 
+          description: body.description, 
+          date: tmpDate.getTime().toString(), 
+          type: body.type === "income",
+          filename: selectedFile !== null ? selectedFile.name : null,  
+          fileToUpload: base64},
+      })
+      .then(result => {
+        console.log('res')
+        if (result.data && result.data.add) {
+          const newBody = { ...result.data.add };
+          newBody["sum"] *= 100;
+          newBody["date"] = new Date(newBody["date"] * 1);
+          setItems((items) => [...items, newBody]);
+        }
+      })
+      .catch(error => {
+        console.error(error);
+        if (error.message.toLowerCase().includes('forbidden')) {
+          navigate('/signIn');
+        }
+      });
     };
   
     const updateItems = async (body, selectedFile) => { 
@@ -167,6 +185,15 @@ function HomePage() {
 //         console.log(err.message);
 //       });
     };
+
+    function fileToBase64(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result.split(';base64,')[1]);
+        reader.onerror = error => reject(error);
+      });
+    }
 
     function ShowPage() {
       if (items !== null) {

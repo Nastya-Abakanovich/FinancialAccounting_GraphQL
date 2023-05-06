@@ -2,11 +2,8 @@ const express = require('express');
 const { graphqlHTTP } = require('express-graphql');
 const { buildSchema } = require('graphql');
 const cors = require('cors');
-
 const jwt = require('jsonwebtoken');
-const multer = require('multer');
 const bodyParser = require('body-parser'); 
-// const mysql = require("mysql2");
 const mysql = require('mysql2/promise');
 const dbConfig = require("./config/db.config.js");
 const jwtConfig = require("./config/jwt.config.js");
@@ -17,22 +14,6 @@ const cookie = require("cookie");
 const fs = require('fs');
 var path = require('path');
 var connection = null;
-
-// const connection = mysql.createConnection({
-//     host: dbConfig.host,
-//     user: dbConfig.user,
-//     database: dbConfig.database,
-//     password: dbConfig.password
-// });
-
-// connection.connect(function(err){
-//     if (err) {
-//         return console.error("Ошибка: " + err.message);
-//     }
-//     else {
-//         console.log("Подключение к серверу MySQL успешно установлено");    
-//     }
-// }); 
 
 async function  mysqlConnection() {
   if (connection === null) {
@@ -46,6 +27,8 @@ async function  mysqlConnection() {
 }
 
 const schema = buildSchema(`
+  scalar Upload
+
   type Token {
     userId: String!
     token: String!
@@ -63,21 +46,20 @@ const schema = buildSchema(`
   }
 
   type Query {
-    hello: String
     login(email: String!, password: String!): Token!
     register(name: String!, email: String!, password: String!): Token!
-    getData: [Spending!]
-    delete(id: Int!): Boolean!
+    getData: [Spending!]    
+  }
+
+  type Mutation {
     deleteFile(id: Int!): Boolean!
+    delete(id: Int!): Boolean!
+    add(sum: Int!, category: String!, description: String!, date: String!, type: Boolean!, filename: String, fileToUpload: String): Spending
   }
   
 `);
 
-// addData(sum: Int!, category: String!, description: String!, date: String!, type: Boolean!, fileToUpload: Upload!): [Spending!]
-
 const root = {
-  hello: () => 'Привет, мир!',
-
   login: async ({ email, password }) => {
     console.log('login');
     
@@ -156,7 +138,7 @@ const root = {
       else {
         try {
           if (selectResult[0].filename !== null) {
-          var fileName = './public/uploads/' + id + path.extname(selectResult[0].filename);
+          // var fileName = './public/uploads/' + id + path.extname(selectResult[0].filename);
           fs.unlinkSync('./public/uploads/' + id + path.extname(selectResult[0].filename));
           console.log('file exists');
           }
@@ -192,45 +174,59 @@ const root = {
       } catch (err) {
         console.log('No After delete file');
         console.error(err);
-        return false;
+        return true;
       }        
           
     } else {
       return false;
     }
-  }
+  },
 
+  add: async ({sum, category, description, date, type, filename, fileToUpload}, req) => {
+      console.log('add');
+      
+      const cookies = req.cookies;
+      if (cookies && cookies.id) {
+        await mysqlConnection();
+        try {
+          const [result] = await connection.execute('INSERT Spending(user_id, sum, date, category, description, income, filename) VALUES (?,?,?,?,?,?,?)',
+            [
+                cookies.id, 
+                sum * 100,
+                new Date(date * 1),
+                category,
+                description,
+                type,
+                filename
+            ]);
+
+          if (fileToUpload !== null) {
+            const buffer = Buffer.from(fileToUpload, 'base64');
+            await fs.promises.writeFile('./public/uploads/' + result.insertId  + path.extname(filename), buffer);
+          }; 
+
+          return {
+            user_id: cookies.id,
+            spending_id: result.insertId,
+            sum: sum,
+            date: date,
+            category: category,
+            description: description,
+            income: type,
+            filename: filename
+          } 
+        } catch (err) {
+          console.error(err);
+          return null;
+        }     
+      } else {
+        return null;
+      }
+    },
 };
 
-
-// console.log('deleteFile');
-
-// const cookies = cookie.parse(socket.handshake?.headers?.cookie === undefined ? "" : socket.handshake.headers.cookie);
-// if (cookies && cookies.id) {
-//     connection.query('SELECT filename FROM Spending WHERE user_id = ' + cookies.id + ' AND spending_id = ' 
-//                     + id, function (err, selectResult) {
-//         if (err) return socket.emit('deleteFileResponse', 'Deletion file error');
-
-//         connection.query('UPDATE Spending SET filename = null WHERE spending_id = ?  AND user_id = ?',
-//         [
-//         id,
-//         cookies.id
-//         ], function (err, result) {
-//             if (err) throw err;
-//             fs.unlink('./public/uploads/' + id + path.extname(selectResult[0].filename), function(err){
-//                 if (err) 
-//                     socket.emit('deleteFileResponse', 'Deletion file error');
-//                 else    
-//                     socket.emit('deleteFileResponse', 'Successfully deleted file');
-//             });          
-//         });
-//     });
-// } else {
-//     socket.emit('deleteFileResponse', 'Deletion file error');
-// }
 const app = express();
 const port = 5000;
-const urlencodedParser = express.urlencoded({extended: false});
 
 var corsOptions = {
   origin: 'http://localhost:3000',
@@ -238,11 +234,12 @@ var corsOptions = {
 };
 app.use(cors(corsOptions));
 app.use(cookieParser());
-app.use(bodyParser.json());
 app.use(express.static('public'));
+app.use(bodyParser.json({limit: '100mb'}));
+app.use(bodyParser.urlencoded({limit: '100mb', extended: true}));
 
 app.use('/graphql', (req, res, next) => {
-  if (!req.body.query.includes('login') && !req.body.query.includes('register'))
+  if (!req.body.query?.includes('login') && !req.body.query?.includes('register'))
   {
      console.log('checkAuth.');
     try {
@@ -264,8 +261,6 @@ app.use('/graphql', (req, res, next) => {
   }
 });
 
-
-
 app.use('/graphql', graphqlHTTP({
   schema: schema,
   rootValue: root,
@@ -276,19 +271,6 @@ app.listen(port, () => {
   console.log('Сервер GraphQL запущен на порте ' + port);
 });
 
-// const storage = multer.diskStorage ({
-//     destination: (req, file, cb) =>{
-//         cb(null, "public/uploads");
-//     },
-//     filename: (req, file, cb) =>{
-//         cb(null, file.originalname);
-//     }
-// })
-// const upload = multer({storage: storage});
-
-// app.use(bodyParser.json());
-// app.use(cookieParser());
-// app.use(express.static('public'));
 
 // app.get('/api/:filename', (req, res) => {
 //     res.status(200).sendFile(__dirname + '/public/uploads/' + req.params.filename, (err, file) => {
@@ -297,25 +279,6 @@ app.listen(port, () => {
 //         else 
 //             res.end(file);
 //       });
-// });
-
-// app.post("/api", upload.single('fileToUpload'), urlencodedParser, middleware, function (req, res) {
-      
-//     if(!req.body) return res.sendStatus(400);     
-
-//     connection.query('INSERT Spending(user_id, sum, date, category, description, income, filename) VALUES (?,?,?,?,?,?,?)',
-//     [
-//     req.cookies.user.id, 
-//     req.body.sum * 100,
-//     req.body.date,
-//     req.body.category,
-//     req.body.description,
-//     req.body.type === 'income',
-//     req.file ? req.file.originalname : null
-//     ], function (err, result) {
-//         if (err) throw err;
-//         res.status(200).json({"spending_id": result.insertId});
-//     }); 
 // });
 
 // app.put("/api", upload.single('fileToUpload'), urlencodedParser, middleware, function(req, res){
@@ -353,20 +316,4 @@ app.listen(port, () => {
 //             res.status(200).send({ message: 'Update item with id=' + req.body.spending_id});
 //         }); 
 //     }
-// });
-
-// app.put("/api/deleteFile", upload.single('fileToUpload'), urlencodedParser, middleware, function(req, res){
-  
-//     if(!req.body) return res.sendStatus(400);
-//     console.log(req.body)
-
-//     connection.query('UPDATE Spending SET filename = null WHERE spending_id = ?  AND user_id = ?',
-//         [
-//             req.body.spending_id,
-//             req.cookies.user.id
-//         ], function (err, result) {
-//             if (err) throw err;
-//             res.status(200).send({ message: 'File delete from item with id=' + req.body.spending_id});
-//         }); 
-
 // });
